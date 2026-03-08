@@ -6,6 +6,8 @@ import requests
 import json
 import os
 from datetime import datetime, timedelta
+import analytics_utils as au
+import numpy as np
 
 # 페이지 설정
 st.set_page_config(page_title="Naver Insight Dashboard", layout="wide", initial_sidebar_state="expanded")
@@ -170,18 +172,39 @@ with st.spinner('데이터를 분석 중입니다...'):
     df_male = get_datalab_search_trend([main_kw], start_date, end_date, gender="m")
     df_female = get_datalab_search_trend([main_kw], start_date, end_date, gender="f")
 
-# --- 메인 대시보드 ---
-st.title("🛡️ Naver API 통합 인사이트 대시보드")
-display_kw = df_trend['Keyword'].unique() if not df_trend.empty else compare_keywords
-st.markdown(f"**분석 키워드:** {', '.join(display_kw)} | **기간:** {start_date} ~ {end_date}")
+# --- 상위 탭 구성 ---
+top_tab1, top_tab2 = st.tabs(["🛡️ Naver 통합 대시보드", "🧠 AI 딥 인사이트"])
+# top_tab1, top_tab2 = st.tabs(["🛡️ Naver 통합 대시보드", "🧠 AI 딥 인사이트"], key="main_top_tabs")
+# Note: Streamlit versions may vary in st.tabs key support, keeping it simple but ensuring unique keys inside.
 
-tabs = st.tabs(["🏠 통합 요약", "📈 트렌드 분석", "👥 사용자 분포", "🛒 쇼핑 트렌드", "📑 채널별 콘텐츠"])
+with top_tab1:
+    # --- Naver 통합 대시보드 UI ---
+    st.title("🛡️ Naver API 통합 인사이트 대시보드")
+    display_kw = df_trend['Keyword'].unique() if not df_trend.empty else compare_keywords
+    st.markdown(f"**분석 키워드:** {', '.join(display_kw)} | **기간:** {start_date} ~ {end_date}")
+
+    tabs = st.tabs(["📈 트렌드 대시보드", "📑 통합 인사이트", "👥 사용자 분포", "🛒 쇼핑 트렌드", "📑 채널별 콘텐츠"])
+    # (기존의 tabs[0]~tabs[4] 블록들이 이 아래로 들어갑니다)
 # st.tabs 자체에 key를 주면 탭 전환 시 상태 보존 및 렌더링 안정성을 높일 수 있습니다.
 # 하지만 st.tabs는 key 인자를 받지 않는 경우가 많으므로 내부 위젯들에 key를 집중합니다.
 
-# 1. 통합 요약 탭
+# 1. 트렌드 분석 탭 (이제 첫 번째 탭)
 with tabs[0]:
-    st.subheader("📌 주요 지표 요약 (KPI)")
+    st.subheader("📈 시계열 트렌드 정밀 분석")
+    if not df_trend.empty:
+        # 시각화 1: Line Chart
+        fig_line = px.line(df_trend, x="Date", y="Ratio", color="Keyword", title="일별 검색 점유율 변화", markers=True)
+        st.plotly_chart(fig_line, width='stretch', key="trend_line_chart")
+        
+        # 시각화 2: Area Chart
+        fig_area = px.area(df_trend, x="Date", y="Ratio", color="Keyword", title="누적 트렌드 비중")
+        st.plotly_chart(fig_area, width='stretch', key="trend_area_chart")
+    else:
+        st.error("데이터를 수집하지 못했습니다.")
+
+# 2. 통합 인사이트 탭 (기존의 요약 탭)
+with tabs[1]:
+    st.subheader("📌 주요 지표 및 인사이트 요약 (KPI)")
     if not df_trend.empty:
         # 그룹화된 키워드 목록 가져오기
         available_keywords = df_trend['Keyword'].unique()
@@ -202,20 +225,6 @@ with tabs[0]:
     with col_right:
         st.write("### 주요 알림")
         st.warning("최근 7일간 '인공지능' 검색량이 전주 대비 15% 상승했습니다.")
-
-# 2. 트렌드 분석 탭
-with tabs[1]:
-    st.subheader("📈 시계열 트렌드 정밀 분석")
-    if not df_trend.empty:
-        # 시각화 1: Line Chart
-        fig_line = px.line(df_trend, x="Date", y="Ratio", color="Keyword", title="일별 검색 점유율 변화", markers=True)
-        st.plotly_chart(fig_line, width='stretch', key="trend_line_chart")
-        
-        # 시각화 2: Area Chart
-        fig_area = px.area(df_trend, x="Date", y="Ratio", color="Keyword", title="누적 트렌드 비중")
-        st.plotly_chart(fig_area, width='stretch', key="trend_area_chart")
-    else:
-        st.error("데이터를 수집하지 못했습니다.")
 
 # 3. 사용자 분포 탭
 with tabs[2]:
@@ -284,3 +293,98 @@ with tabs[4]:
             if st.button("다음 페이지 ➡️", key="next_button"):
                 st.session_state.page += 1
                 st.rerun()
+
+with top_tab2:
+    # --- AI Deep Insights UI (React 스타일 이식) ---
+    st.markdown("""
+    <div style="text-align: center; padding: 20px 0;">
+        <h1 style="font-size: 3rem; margin-bottom: 0;">AI 딥 인사이트</h1>
+        <p style="color: #64748b;">Gemini vs Claude 다차원 검색 트렌드 분석 리포트</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 2번 탭용 데이터 처리
+    if not df_trend.empty:
+        # 키워드 필터링 (정규표현식 메타문자 주의하여 more lenient 하게 변경)
+        df_ai = df_trend.copy()
+        
+        # 데이터 피벗
+        df_pivot = df_ai.pivot(index='Date', columns='Keyword', values='Ratio').reset_index()
+        
+        # 유연한 키워드 매핑
+        # 1순위: '제미나이', 'Gemini' 포함 컬럼 / 2순위: '클로드', 'Claude' 포함 컬럼
+        g_cols = [c for c in df_pivot.columns if any(x in c.lower() for x in ['gemini', '제미나이'])]
+        c_cols = [c for c in df_pivot.columns if any(x in c.lower() for x in ['claude', '클로드'])]
+        
+        # 만약 명시적인 AI 키워드가 없다면 데이터프레임의 첫 두 컬럼(날짜 제외)을 사용
+        if not g_cols and len(df_pivot.columns) > 1:
+            g_cols = [df_pivot.columns[1]]
+        if not c_cols and len(df_pivot.columns) > 2:
+            c_cols = [df_pivot.columns[2]]
+            
+        if g_cols and c_cols:
+            g_name = g_cols[0]
+            c_name = c_cols[0]
+            
+            # 분석용 데이터프레임 정리
+            df_final = df_pivot[['Date', g_name, c_name]].rename(columns={g_name: 'Gemini_Ratio', c_name: 'Claude_Ratio'})
+            
+            # 분석 데이터 계산
+            df_final['Gemini_MA7'] = au.calculate_ma(df_final, 7, 'Gemini_Ratio')
+            df_final['Claude_MA7'] = au.calculate_ma(df_final, 7, 'Claude_Ratio')
+            
+            deep_sub_tabs = st.tabs(["⚡ 트렌드 개요", "📅 기간/요일 분석", "📊 상관성/인사이트", "🗂️ 원본 데이터"])
+            
+            # 1. 트렌드 개요
+            with deep_sub_tabs[0]:
+                fig_deep = go.Figure()
+                fig_deep.add_trace(go.Scatter(x=df_final['Date'], y=df_final['Gemini_Ratio'], name=f'{g_name} (Daily)', line=dict(color='rgba(99, 102, 241, 0.3)', width=1)))
+                fig_deep.add_trace(go.Scatter(x=df_final['Date'], y=df_final['Gemini_MA7'], name=f'{g_name} (7d MA)', line=dict(color='#6366f1', width=3)))
+                fig_deep.add_trace(go.Scatter(x=df_final['Date'], y=df_final['Claude_Ratio'], name=f'{c_name} (Daily)', line=dict(color='rgba(236, 72, 153, 0.3)', width=1)))
+                fig_deep.add_trace(go.Scatter(x=df_final['Date'], y=df_final['Claude_MA7'], name=f'{c_name} (7d MA)', line=dict(color='#ec4899', width=3)))
+                
+                fig_deep.update_layout(title="일별 추이 및 7일 이동평균선", template="plotly_dark", height=500)
+                st.plotly_chart(fig_deep, width='stretch', key="deep_main_chart")
+                
+                # Stat Cards (KPIs)
+                kpi1, kpi2, kpi3 = st.columns(3)
+                corr = au.calculate_correlation(df_final['Gemini_Ratio'].tolist(), df_final['Claude_Ratio'].tolist())
+                
+                kpi1.metric(f"{g_name} 평균", f"{df_final['Gemini_Ratio'].mean():.2f}")
+                kpi2.metric(f"{c_name} 평균", f"{df_final['Claude_Ratio'].mean():.2f}")
+                kpi3.metric("검색 상관계수", f"{corr:.4f}", help="1에 가까울수록 동반 상승/하락")
+            
+            # 2. 기간/요일 분석
+            with deep_sub_tabs[1]:
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    df_month = au.group_by_period(df_final, 'month')
+                    fig_month = px.bar(df_month, x='label', y=['Gemini', 'Claude'], barmode='group', title="월별 평균 검색 비중", color_discrete_map={'Gemini':'#6366f1', 'Claude':'#ec4899'})
+                    # 범례 이름 수정
+                    fig_month.for_each_trace(lambda t: t.update(name = g_name if t.name == 'Gemini' else c_name))
+                    st.plotly_chart(fig_month, width='stretch', key="deep_month_chart")
+                with col_p2:
+                    df_day = au.group_by_day_of_week(df_final)
+                    fig_radar = go.Figure()
+                    fig_radar.add_trace(go.Scatterpolar(r=df_day['Gemini'], theta=df_day['day'], fill='toself', name=g_name, line_color='#6366f1'))
+                    fig_radar.add_trace(go.Scatterpolar(r=df_day['Claude'], theta=df_day['day'], fill='toself', name=c_name, line_color='#ec4899'))
+                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, float(df_day[['Gemini','Claude']].values.max())*1.1])), showlegend=True, title="요일별 분석 (Radar)")
+                    st.plotly_chart(fig_radar, width='stretch', key="deep_radar_chart")
+            
+            # 3. 상관성/인사이트
+            with deep_sub_tabs[2]:
+                st.markdown("### 📜 데이터 종합 분석 결론")
+                insight_text = f"""
+                1. **성장 모멘텀**: {g_name}의 평균 지수는 **{df_final['Gemini_Ratio'].mean():.2f}**로 {c_name}(**{df_final['Claude_Ratio'].mean():.2f}**) 대비 {'우위에 있습니다' if df_final['Gemini_Ratio'].mean() > df_final['Claude_Ratio'].mean() else '추격 중입니다'}.
+                2. **상관성**: 두 모델의 상관계수는 **{corr:.4f}**입니다. {'매우 높은 양의 상관관계가 관찰되며, AI 시장 전체의 관심도가 함께 움직이고 있음' if corr > 0.7 else '독자적인 트렌드 흐름을 보이고 있음'}을 시사합니다.
+                3. **변동성**: 두 모델 모두 특정 이벤트에 민감하게 반응하며, 시장 점유율 확대를 위한 격전이 지속되고 있습니다.
+                """
+                st.info(insight_text)
+            
+            # 4. 원본 데이터
+            with deep_sub_tabs[3]:
+                st.dataframe(df_final.sort_values('Date', ascending=False), width=None, use_container_width=True, key="deep_raw_data")
+        else:
+            st.warning("분석할 키워드 데이터가 충분하지 않습니다. 사이드바에서 비교 키워드를 입력해 주세요.")
+    else:
+        st.warning("데이터가 없어 대시보드를 표시할 수 없습니다.")
