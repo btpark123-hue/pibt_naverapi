@@ -185,114 +185,114 @@ with top_tab1:
 
     tabs = st.tabs(["📈 트렌드 대시보드", "📑 통합 인사이트", "👥 사용자 분포", "🛒 쇼핑 트렌드", "📑 채널별 콘텐츠"])
     # (기존의 tabs[0]~tabs[4] 블록들이 이 아래로 들어갑니다)
-# st.tabs 자체에 key를 주면 탭 전환 시 상태 보존 및 렌더링 안정성을 높일 수 있습니다.
-# 하지만 st.tabs는 key 인자를 받지 않는 경우가 많으므로 내부 위젯들에 key를 집중합니다.
+    # st.tabs 자체에 key를 주면 탭 전환 시 상태 보존 및 렌더링 안정성을 높일 수 있습니다.
+    # 하지만 st.tabs는 key 인자를 받지 않는 경우가 많으므로 내부 위젯들에 key를 집중합니다.
 
-# 1. 트렌드 분석 탭 (이제 첫 번째 탭)
-with tabs[0]:
-    st.subheader("📈 시계열 트렌드 정밀 분석")
-    if not df_trend.empty:
-        # 시각화 1: Line Chart
-        fig_line = px.line(df_trend, x="Date", y="Ratio", color="Keyword", title="일별 검색 점유율 변화", markers=True)
-        st.plotly_chart(fig_line, width='stretch', key="trend_line_chart")
+    # 1. 트렌드 분석 탭 (이제 첫 번째 탭)
+    with tabs[0]:
+        st.subheader("📈 시계열 트렌드 정밀 분석")
+        if not df_trend.empty:
+            # 시각화 1: Line Chart
+            fig_line = px.line(df_trend, x="Date", y="Ratio", color="Keyword", title="일별 검색 점유율 변화", markers=True)
+            st.plotly_chart(fig_line, width='stretch', key="trend_line_chart")
+            
+            # 시각화 2: Area Chart
+            fig_area = px.area(df_trend, x="Date", y="Ratio", color="Keyword", title="누적 트렌드 비중")
+            st.plotly_chart(fig_area, width='stretch', key="trend_area_chart")
+        else:
+            st.error("데이터를 수집하지 못했습니다.")
+
+    # 2. 통합 인사이트 탭 (기존의 요약 탭)
+    with tabs[1]:
+        st.subheader("📌 주요 지표 및 인사이트 요약 (KPI)")
+        if not df_trend.empty:
+            # 그룹화된 키워드 목록 가져오기
+            available_keywords = df_trend['Keyword'].unique()
+            cols = st.columns(len(available_keywords))
+            for i, kw_label in enumerate(available_keywords):
+                kw_data = df_trend[df_trend['Keyword'] == kw_label]
+                if not kw_data.empty:
+                    latest_val = kw_data['Ratio'].iloc[-1]
+                    avg_val = kw_data['Ratio'].mean()
+                    cols[i].metric(label=f"{kw_label} 관심도", value=f"{latest_val:.1f}", delta=f"평균 대비 {(latest_val-avg_val):.1f}")
         
-        # 시각화 2: Area Chart
-        fig_area = px.area(df_trend, x="Date", y="Ratio", color="Keyword", title="누적 트렌드 비중")
-        st.plotly_chart(fig_area, width='stretch', key="trend_area_chart")
-    else:
-        st.error("데이터를 수집하지 못했습니다.")
+        st.divider()
+        col_left, col_right = st.columns([2, 1])
+        with col_left:
+            st.write("### 실시간 언급량 상위 토픽 (뉴스/블로그 통합)")
+            # 간단한 워드 클라우드 대신 테이블로 대체
+            st.info("현재 분석된 기술적 상관계수(Correlation): **0.82** (매우 높음)")
+        with col_right:
+            st.write("### 주요 알림")
+            st.warning("최근 7일간 '인공지능' 검색량이 전주 대비 15% 상승했습니다.")
 
-# 2. 통합 인사이트 탭 (기존의 요약 탭)
-with tabs[1]:
-    st.subheader("📌 주요 지표 및 인사이트 요약 (KPI)")
-    if not df_trend.empty:
-        # 그룹화된 키워드 목록 가져오기
-        available_keywords = df_trend['Keyword'].unique()
-        cols = st.columns(len(available_keywords))
-        for i, kw_label in enumerate(available_keywords):
-            kw_data = df_trend[df_trend['Keyword'] == kw_label]
-            if not kw_data.empty:
-                latest_val = kw_data['Ratio'].iloc[-1]
-                avg_val = kw_data['Ratio'].mean()
-                cols[i].metric(label=f"{kw_label} 관심도", value=f"{latest_val:.1f}", delta=f"평균 대비 {(latest_val-avg_val):.1f}")
-    
-    st.divider()
-    col_left, col_right = st.columns([2, 1])
-    with col_left:
-        st.write("### 실시간 언급량 상위 토픽 (뉴스/블로그 통합)")
-        # 간단한 워드 클라우드 대신 테이블로 대체
-        st.info("현재 분석된 기술적 상관계수(Correlation): **0.82** (매우 높음)")
-    with col_right:
-        st.write("### 주요 알림")
-        st.warning("최근 7일간 '인공지능' 검색량이 전주 대비 15% 상승했습니다.")
+    # 3. 사용자 분포 탭
+    with tabs[2]:
+        st.subheader("👥 사용자 인구통계 분석")
+        if not df_male.empty and not df_female.empty:
+            c1, c2 = st.columns(2)
+            m_avg = df_male['Ratio'].mean()
+            f_avg = df_female['Ratio'].mean()
+            gender_df = pd.DataFrame({"성별": ["남성", "여성"], "평균관심도": [m_avg, f_avg]})
+            
+            with c1:
+                # 시각화 3: Bar Chart (성별 비교)
+                fig_bar = px.bar(gender_df, x="성별", y="평균관심도", color="성별", title=f"'{main_kw}' 성별 관심도 비교")
+                st.plotly_chart(fig_bar, width='stretch', key="gender_bar_chart")
+            with c2:
+                # 시각화 4: Pie Chart (성별 비중)
+                fig_pie = px.pie(gender_df, values="평균관심도", names="성별", title="성별 관심 점유율", hole=.3)
+                st.plotly_chart(fig_pie, width='stretch', key="gender_pie_chart")
+        else:
+            st.warning(f"'{main_kw}' 키워드에 대한 성별 분석 데이터가 충분하지 않습니다.")
 
-# 3. 사용자 분포 탭
-with tabs[2]:
-    st.subheader("👥 사용자 인구통계 분석")
-    if not df_male.empty and not df_female.empty:
-        c1, c2 = st.columns(2)
-        m_avg = df_male['Ratio'].mean()
-        f_avg = df_female['Ratio'].mean()
-        gender_df = pd.DataFrame({"성별": ["남성", "여성"], "평균관심도": [m_avg, f_avg]})
+    # 4. 쇼핑 트렌드 탭
+    with tabs[3]:
+        st.subheader("🛒 쇼핑 카테고리 인사이트")
+        # 샘플 데이터 시뮬레이션 (Scatter Plot)
+        shopping_data = pd.DataFrame({
+            "Category": ["AI 스피커", "AI 로봇청소기", "AI 카메라", "소프트웨어", "기타"],
+            "Clicks": [85, 42, 67, 31, 15],
+            "Sales": [1200, 4500, 3200, 800, 500],
+            "Price": [100000, 500000, 300000, 50000, 20000]
+        })
+        # 시각화 5: Scatter Plot
+        fig_scatter = px.scatter(shopping_data, x="Clicks", y="Sales", size="Price", color="Category", 
+                                 hover_name="Category", title="쇼핑 카테고리별 클릭-매출 상관관계 (버블 차트)")
+        st.plotly_chart(fig_scatter, width='stretch', key="shopping_scatter_chart")
+
+    # 5. 채널별 콘텐츠 탭
+    with tabs[4]:
+        ch = st.selectbox("채널 선택", ["news", "shop", "blog", "cafearticle"], 
+                           format_func=lambda x: {"news":"뉴스", "shop":"쇼핑", "blog":"블로그", "cafearticle":"카페"}[x],
+                           key="channel_selector")
         
-        with c1:
-            # 시각화 3: Bar Chart (성별 비교)
-            fig_bar = px.bar(gender_df, x="성별", y="평균관심도", color="성별", title=f"'{main_kw}' 성별 관심도 비교")
-            st.plotly_chart(fig_bar, width='stretch', key="gender_bar_chart")
-        with c2:
-            # 시각화 4: Pie Chart (성별 비중)
-            fig_pie = px.pie(gender_df, values="평균관심도", names="성별", title="성별 관심 점유율", hole=.3)
-            st.plotly_chart(fig_pie, width='stretch', key="gender_pie_chart")
-    else:
-        st.warning(f"'{main_kw}' 키워드에 대한 성별 분석 데이터가 충분하지 않습니다.")
-
-# 4. 쇼핑 트렌드 탭
-with tabs[3]:
-    st.subheader("🛒 쇼핑 카테고리 인사이트")
-    # 샘플 데이터 시뮬레이션 (Scatter Plot)
-    shopping_data = pd.DataFrame({
-        "Category": ["AI 스피커", "AI 로봇청소기", "AI 카메라", "소프트웨어", "기타"],
-        "Clicks": [85, 42, 67, 31, 15],
-        "Sales": [1200, 4500, 3200, 800, 500],
-        "Price": [100000, 500000, 300000, 50000, 20000]
-    })
-    # 시각화 5: Scatter Plot
-    fig_scatter = px.scatter(shopping_data, x="Clicks", y="Sales", size="Price", color="Category", 
-                             hover_name="Category", title="쇼핑 카테고리별 클릭-매출 상관관계 (버블 차트)")
-    st.plotly_chart(fig_scatter, width='stretch', key="shopping_scatter_chart")
-
-# 5. 채널별 콘텐츠 탭
-with tabs[4]:
-    ch = st.selectbox("채널 선택", ["news", "shop", "blog", "cafearticle"], 
-                       format_func=lambda x: {"news":"뉴스", "shop":"쇼핑", "blog":"블로그", "cafearticle":"카페"}[x],
-                       key="channel_selector")
-    
-    if 'page' not in st.session_state: st.session_state.page = 1
-    display_num = 10
-    start_idx = (st.session_state.page - 1) * display_num + 1
-    
-    with st.spinner('리스트를 불러오는 중...'):
-        res = search_naver(ch, main_kw, display=display_num, start=start_idx)
-    
-    if res:
-        st.write(f"총 {res.get('total', 0):,}건 중 {start_idx}번째부터 표시됩니다.")
-        for item in res.get('items', []):
-            with st.expander(item.get('title', '').replace('<b>', '').replace('</b>', ''), expanded=True):
-                st.markdown(f"**[{item.get('title', '').replace('<b>', '').replace('</b>', '')}]({item.get('link') or item.get('originallink')})**")
-                st.write(item.get('description', '').replace('<b>', '').replace('</b>', ''))
-                if ch == 'shop': st.caption(f"최저가: {item.get('lprice')}원 | 판매처: {item.get('mallName')}")
+        if 'page' not in st.session_state: st.session_state.page = 1
+        display_num = 10
+        start_idx = (st.session_state.page - 1) * display_num + 1
         
-        # 페이징 컨트롤
-        p1, p2, p3 = st.columns([1,1,1])
-        with p1: 
-            if st.button("⬅️ 이전 페이지", key="prev_button") and st.session_state.page > 1:
-                st.session_state.page -= 1
-                st.rerun()
-        with p2: st.markdown(f"<h4 style='text-align:center;'>P. {st.session_state.page}</h4>", unsafe_allow_html=True)
-        with p3:
-            if st.button("다음 페이지 ➡️", key="next_button"):
-                st.session_state.page += 1
-                st.rerun()
+        with st.spinner('리스트를 불러오는 중...'):
+            res = search_naver(ch, main_kw, display=display_num, start=start_idx)
+        
+        if res:
+            st.write(f"총 {res.get('total', 0):,}건 중 {start_idx}번째부터 표시됩니다.")
+            for item in res.get('items', []):
+                with st.expander(item.get('title', '').replace('<b>', '').replace('</b>', ''), expanded=True):
+                    st.markdown(f"**[{item.get('title', '').replace('<b>', '').replace('</b>', '')}]({item.get('link') or item.get('originallink')})**")
+                    st.write(item.get('description', '').replace('<b>', '').replace('</b>', ''))
+                    if ch == 'shop': st.caption(f"최저가: {item.get('lprice')}원 | 판매처: {item.get('mallName')}")
+            
+            # 페이징 컨트롤
+            p1, p2, p3 = st.columns([1,1,1])
+            with p1: 
+                if st.button("⬅️ 이전 페이지", key="prev_button") and st.session_state.page > 1:
+                    st.session_state.page -= 1
+                    st.rerun()
+            with p2: st.markdown(f"<h4 style='text-align:center;'>P. {st.session_state.page}</h4>", unsafe_allow_html=True)
+            with p3:
+                if st.button("다음 페이지 ➡️", key="next_button"):
+                    st.session_state.page += 1
+                    st.rerun()
 
 with top_tab2:
     # --- AI Deep Insights UI (React 스타일 이식) ---
